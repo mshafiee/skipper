@@ -26,18 +26,6 @@ import (
 	"github.com/zalando/skipper/swarm"
 )
 
-const (
-	defaultSwarmRedisUpdateInterval      = 10 * time.Second
-	defaultSwarmRedisConnMetricsInterval = 60 * time.Second
-	defaultSwarmRedisMetricsPrefix       = "swarm.redis."
-	defaultSwarmRedisDialTimeout         = 25 * time.Millisecond
-	defaultSwarmRedisReadTimeout         = 25 * time.Millisecond
-	defaultSwarmRedisWriteTimeout        = 25 * time.Millisecond
-	defaultSwarmRedisPoolTimeout         = 25 * time.Millisecond
-	defaultSwarmRedisMinIdleConns        = 100
-	defaultSwarmRedisMaxIdleConns        = 100
-)
-
 type Config struct {
 	ConfigFile string
 	Flags      *flag.FlagSet
@@ -283,7 +271,9 @@ type Config struct {
 	MaxIdleConnsBackend          int           `yaml:"max-idle-connection-backend"`
 	DisableHTTPKeepalives        bool          `yaml:"disable-http-keepalives"`
 
-	EnableSwarm                       bool          `yaml:"enable-swarm"`
+	// swarm:
+	EnableSwarm bool `yaml:"enable-swarm"`
+	// redis based
 	SwarmRedisURLs                    *listFlag     `yaml:"swarm-redis-urls"`
 	SwarmRedisPassword                string        `yaml:"swarm-redis-password"`
 	SwarmRedisClusterMode             bool          `yaml:"swarm-redis-cluster-mode"`
@@ -308,6 +298,7 @@ type Config struct {
 	SwarmRedisConnMetricsInterval     time.Duration `yaml:"swarm-redis-conn-metrics-interval"`
 	SwarmRedisMetricsPrefix           string        `yaml:"swarm-redis-metrics-prefix"`
 	SwarmRedisIdleCheckFrequency      time.Duration `yaml:"swarm-redis-idle-check-frequency"`
+	// swim based
 	SwarmKubernetesNamespace          string        `yaml:"swarm-namespace"`
 	SwarmKubernetesLabelSelectorKey   string        `yaml:"swarm-label-selector-key"`
 	SwarmKubernetesLabelSelectorValue string        `yaml:"swarm-label-selector-value"`
@@ -346,6 +337,17 @@ const (
 
 	// environment keys:
 	redisPasswordEnv = "SWARM_REDIS_PASSWORD"
+
+	// Redis defaults
+	defaultSwarmRedisUpdateInterval      = 10 * time.Second
+	defaultSwarmRedisConnMetricsInterval = 60 * time.Second
+	defaultSwarmRedisMetricsPrefix       = "swarm.redis."
+	defaultSwarmRedisDialTimeout         = 25 * time.Millisecond
+	defaultSwarmRedisReadTimeout         = 25 * time.Millisecond
+	defaultSwarmRedisWriteTimeout        = 25 * time.Millisecond
+	defaultSwarmRedisPoolTimeout         = 25 * time.Millisecond
+	defaultSwarmRedisMinIdleConns        = 100
+	defaultSwarmRedisMaxIdleConns        = 100
 )
 
 func NewConfig() *Config {
@@ -622,12 +624,12 @@ func NewConfig() *Config {
 	flag.BoolVar(&cfg.DisableHTTPKeepalives, "disable-http-keepalives", false, "forces backend to always create a new connection")
 	flag.BoolVar(&cfg.KubernetesEnableTLS, "kubernetes-enable-tls", false, "enable using kubnernetes resources to terminate tls")
 
-	// Swarm / Redis
-	flag.BoolVar(&cfg.EnableSwarm, "enable-swarm", false, "enable swarm communication between nodes in a skipper fleet (required for cluster ratelimits or swim-based discovery)")
-	flag.Var(cfg.SwarmRedisURLs, "swarm-redis-urls", "Redis URLs (comma separated) for cluster ratelimits or other Redis features. Use "+redisPasswordEnv+" environment variable or 'swarm-redis-password' key in config file to set redis password")
+	// Swarm:
+	flag.BoolVar(&cfg.EnableSwarm, "enable-swarm", false, "enable swarm communication between nodes in a skipper fleet")
+	flag.Var(cfg.SwarmRedisURLs, "swarm-redis-urls", "Redis URLs as comma separated list, used for building a swarm, for example in redis based cluster ratelimits.\nUse "+redisPasswordEnv+" environment variable or 'swarm-redis-password' key in config file to set redis password")
 	flag.StringVar(&cfg.SwarmRedisPassword, "swarm-redis-password", "", "Password for Redis connection")
 	flag.BoolVar(&cfg.SwarmRedisClusterMode, "swarm-redis-cluster-mode", false, "Enable Redis Cluster mode (instead of Ring mode)")
-	flag.StringVar(&cfg.SwarmRedisHashAlgorithm, "swarm-redis-hash-algorithm", "", "Ring mode only: Hash algorithm <jump|mpchash|rendezvous|rendezvousVnodes>, defaults to go-redis default (rendezvous)")
+	flag.StringVar(&cfg.SwarmRedisHashAlgorithm, "swarm-redis-hash-algorithm", "", "sets hash algorithm to be used in redis ring client to find the shard <jump|mpchash|rendezvous|rendezvousVnodes>, defaults to github.com/redis/go-redis default")
 	flag.DurationVar(&cfg.SwarmRedisDialTimeout, "swarm-redis-dial-timeout", defaultSwarmRedisDialTimeout, "Redis client dial timeout")
 	flag.DurationVar(&cfg.SwarmRedisReadTimeout, "swarm-redis-read-timeout", defaultSwarmRedisReadTimeout, "Redis socket read timeout")
 	flag.DurationVar(&cfg.SwarmRedisWriteTimeout, "swarm-redis-write-timeout", defaultSwarmRedisWriteTimeout, "Redis socket write timeout")
@@ -649,14 +651,14 @@ func NewConfig() *Config {
 	flag.StringVar(&cfg.SwarmRedisMetricsPrefix, "swarm-redis-metrics-prefix", defaultSwarmRedisMetricsPrefix, "Prefix for Redis client metrics")
 	flag.DurationVar(&cfg.SwarmRedisIdleCheckFrequency, "swarm-redis-idle-check-frequency", 0, "Frequency for reaping idle Redis connections (informational, 0 disables if ConnMaxIdleTime is 0)")
 
-	flag.StringVar(&cfg.SwarmKubernetesNamespace, "swarm-namespace", swarm.DefaultNamespace, "Kubernetes namespace to find swim peer instances")
-	flag.StringVar(&cfg.SwarmKubernetesLabelSelectorKey, "swarm-label-selector-key", swarm.DefaultLabelSelectorKey, "Kubernetes labelselector key to find swim peer instances")
-	flag.StringVar(&cfg.SwarmKubernetesLabelSelectorValue, "swarm-label-selector-value", swarm.DefaultLabelSelectorValue, "Kubernetes labelselector value to find swim peer instances")
-	flag.IntVar(&cfg.SwarmPort, "swarm-port", swarm.DefaultPort, "Swim port to use to communicate with our peers")
-	flag.IntVar(&cfg.SwarmMaxMessageBuffer, "swarm-max-msg-buffer", swarm.DefaultMaxMessageBuffer, "Swim max message buffer size to use for member list messages")
-	flag.DurationVar(&cfg.SwarmLeaveTimeout, "swarm-leave-timeout", swarm.DefaultLeaveTimeout, "Swim leave timeout to use for leaving the memberlist on timeout")
-	flag.StringVar(&cfg.SwarmStaticSelf, "swarm-static-self", "", "Set static swim self node, for example 127.0.0.1:9001")
-	flag.StringVar(&cfg.SwarmStaticOther, "swarm-static-other", "", "Set static swim all nodes, for example 127.0.0.1:9002,127.0.0.1:9003")
+	flag.StringVar(&cfg.SwarmKubernetesNamespace, "swarm-namespace", swarm.DefaultNamespace, "Kubernetes namespace to find swarm peer instances")
+	flag.StringVar(&cfg.SwarmKubernetesLabelSelectorKey, "swarm-label-selector-key", swarm.DefaultLabelSelectorKey, "Kubernetes labelselector key to find swarm peer instances")
+	flag.StringVar(&cfg.SwarmKubernetesLabelSelectorValue, "swarm-label-selector-value", swarm.DefaultLabelSelectorValue, "Kubernetes labelselector value to find swarm peer instances")
+	flag.IntVar(&cfg.SwarmPort, "swarm-port", swarm.DefaultPort, "swarm port to use to communicate with our peers")
+	flag.IntVar(&cfg.SwarmMaxMessageBuffer, "swarm-max-msg-buffer", swarm.DefaultMaxMessageBuffer, "swarm max message buffer size to use for member list messages")
+	flag.DurationVar(&cfg.SwarmLeaveTimeout, "swarm-leave-timeout", swarm.DefaultLeaveTimeout, "swarm leave timeout to use for leaving the memberlist on timeout")
+	flag.StringVar(&cfg.SwarmStaticSelf, "swarm-static-self", "", "set static swarm self node, for example 127.0.0.1:9001")
+	flag.StringVar(&cfg.SwarmStaticOther, "swarm-static-other", "", "set static swarm all nodes, for example 127.0.0.1:9002,127.0.0.1:9003")
 
 	flag.IntVar(&cfg.ClusterRatelimitMaxGroupShards, "cluster-ratelimit-max-group-shards", 1, "sets the maximum number of group shards for the clusterRatelimit filter")
 
@@ -677,7 +679,7 @@ func (c *Config) buildRedisTLSConfig() *tls.Config {
 
 	tlsConfig := &tls.Config{
 		ServerName:         c.SwarmRedisTLSServerName,
-		InsecureSkipVerify: c.SwarmRedisTLSInsecureSkipVerify,
+		InsecureSkipVerify: c.SwarmRedisTLSInsecureSkipVerify, // #nosec G402 - user-controlled config option
 		MinVersion:         c.getMinTLSVersion(),
 	}
 
@@ -980,16 +982,17 @@ func (c *Config) ToOptions() skipper.Options {
 		SuppressRouteUpdateLogs:             c.SuppressRouteUpdateLogs,
 
 		// route sources:
-		EtcdUrls:        eus,
-		EtcdPrefix:      c.EtcdPrefix,
-		EtcdWaitTimeout: c.EtcdTimeout,
-		EtcdInsecure:    c.EtcdInsecure,
-		EtcdOAuthToken:  c.EtcdOAuthToken,
-		EtcdUsername:    c.EtcdUsername,
-		EtcdPassword:    c.EtcdPassword,
-		WatchRoutesFile: c.RoutesFile,
-		RoutesURLs:      c.RoutesURLs.values,
-		InlineRoutes:    c.InlineRoutes,
+		EtcdUrls:          eus,
+		EtcdPrefix:        c.EtcdPrefix,
+		EtcdWaitTimeout:   c.EtcdTimeout,
+		EtcdInsecure:      c.EtcdInsecure,
+		EtcdOAuthToken:    c.EtcdOAuthToken,
+		EtcdUsername:      c.EtcdUsername,
+		EtcdPassword:      c.EtcdPassword,
+		WatchRoutesFile:   c.RoutesFile,
+		RoutesURLs:        c.RoutesURLs.values,
+		InlineRoutes:      c.InlineRoutes,
+		ForwardBackendURL: c.ForwardBackendURL,
 		DefaultFilters: &eskip.DefaultFilters{
 			Prepend: c.PrependFilters.filters,
 			Append:  c.AppendFilters.filters,
@@ -1095,7 +1098,9 @@ func (c *Config) ToOptions() skipper.Options {
 		DisableHTTPKeepalives:        c.DisableHTTPKeepalives,
 		KubernetesEnableTLS:          c.KubernetesEnableTLS,
 
-		EnableSwarm:                       c.EnableSwarm,
+		// swarm:
+		EnableSwarm: c.EnableSwarm,
+		// swim based
 		SwarmKubernetesNamespace:          c.SwarmKubernetesNamespace,
 		SwarmKubernetesLabelSelectorKey:   c.SwarmKubernetesLabelSelectorKey,
 		SwarmKubernetesLabelSelectorValue: c.SwarmKubernetesLabelSelectorValue,
@@ -1327,7 +1332,7 @@ func (c *Config) checkDeprecated(configKeys map[string]interface{}, options ...s
 		_, fk := flagKeys[name]
 		if ck || fk {
 			f := c.Flags.Lookup(name)
-			log.Warnf("Deprecated option used - %s: %s", f.Name, f.Usage)
+			log.Warnf("%s: %s", f.Name, f.Usage)
 		}
 	}
 }
