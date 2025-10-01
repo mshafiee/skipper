@@ -13,7 +13,7 @@ func Test_newClusterRateLimiter(t *testing.T) {
 	redisAddr, done := redistest.NewTestRedis(t)
 	defer done()
 
-	myring := net.NewRedisRingClient(
+	myring := net.NewRedisClient(
 		&net.RedisOptions{
 			Addrs: []string{redisAddr},
 		},
@@ -35,7 +35,7 @@ func Test_newClusterRateLimiter(t *testing.T) {
 		name     string
 		settings Settings
 		swarm    Swarmer
-		ring     *net.RedisRingClient
+		ring     *net.RedisClient
 		group    string
 		want     limiter
 	}{
@@ -57,10 +57,10 @@ func Test_newClusterRateLimiter(t *testing.T) {
 			ring:  myring,
 			group: "mygroup",
 			want: &clusterLimitRedis{
-				group:      "mygroup",
-				maxHits:    10,
-				window:     3 * time.Second,
-				ringClient: myring,
+				group:       "mygroup",
+				maxHits:     10,
+				window:      3 * time.Second,
+				redisClient: myring,
 			},
 		},
 		{

@@ -170,16 +170,16 @@ func TestRedisClient(t *testing.T) {
 	} {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			cli := NewRedisRingClient(tt.options)
+			cli := NewRedisClient(tt.options)
 			defer func() {
 				if !cli.closed {
-					t.Error("Failed to close redis ring client")
+					t.Error("Failed to close redis client")
 				}
 			}()
 			defer cli.Close()
 
-			if !cli.RingAvailable() {
-				t.Error("Failed to have a connected redis client, ring not available")
+			if !cli.IsAvailable() {
+				t.Error("Failed to have a connected redis client, not available")
 			}
 
 			if tt.options.AddrUpdater != nil {
@@ -215,8 +215,9 @@ func TestRedisClient(t *testing.T) {
 				span.Finish()
 			}
 
-			if tt.options.ConnMetricsInterval != defaultConnMetricsInterval {
-				cli.StartMetricsCollection()
+			if tt.options.ConnMetricsInterval != DefaultRedisConnMetricsInterval {
+				ctx := context.Background()
+				cli.StartMetricsCollection(ctx)
 				time.Sleep(tt.options.ConnMetricsInterval)
 			}
 		})
@@ -326,7 +327,7 @@ func TestRedisClientGetSet(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			cli := NewRedisRingClient(tt.options)
+			cli := NewRedisClient(tt.options)
 			defer cli.Close()
 			ctx := context.Background()
 
@@ -474,7 +475,7 @@ func TestRedisClientZAddZCard(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			cli := NewRedisRingClient(tt.options)
+			cli := NewRedisClient(tt.options)
 			defer cli.Close()
 			ctx := context.Background()
 
@@ -607,7 +608,7 @@ func TestRedisClientExpire(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			cli := NewRedisRingClient(tt.options)
+			cli := NewRedisClient(tt.options)
 			defer cli.Close()
 			ctx := context.Background()
 
@@ -767,7 +768,7 @@ func TestRedisClientZRemRangeByScore(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			cli := NewRedisRingClient(tt.options)
+			cli := NewRedisClient(tt.options)
 			defer cli.Close()
 			ctx := context.Background()
 
@@ -984,7 +985,7 @@ func TestRedisClientZRangeByScoreWithScoresFirst(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			cli := NewRedisRingClient(tt.options)
+			cli := NewRedisClient(tt.options)
 			defer cli.Close()
 			ctx := context.Background()
 
@@ -1065,7 +1066,7 @@ func TestRedisClientSetAddr(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			r := NewRedisRingClient(tt.options)
+			r := NewRedisClient(tt.options)
 			defer r.Close()
 			for i := 0; i < len(tt.keys); i++ {
 				r.Set(context.Background(), tt.keys[i], tt.vals[i], time.Second)
@@ -1087,7 +1088,7 @@ func TestRedisClientSetAddr(t *testing.T) {
 }
 
 func TestRedisClientFailingAddrUpdater(t *testing.T) {
-	cli := NewRedisRingClient(&RedisOptions{
+	cli := NewRedisClient(&RedisOptions{
 		AddrUpdater: func() ([]string, error) {
 			return nil, fmt.Errorf("failed to get addresses")
 		},
@@ -1095,7 +1096,7 @@ func TestRedisClientFailingAddrUpdater(t *testing.T) {
 	})
 	defer cli.Close()
 
-	if cli.RingAvailable() {
-		t.Error("Unexpected available ring")
+	if cli.IsAvailable() {
+		t.Error("Unexpected available client")
 	}
 }

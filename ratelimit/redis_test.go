@@ -69,7 +69,7 @@ func Test_clusterLimitRedis_WithPass(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			ringClient := net.NewRedisRingClient(&net.RedisOptions{
+			ringClient := net.NewRedisClient(&net.RedisOptions{
 				Addrs:    []string{redisAddr},
 				Password: tt.password,
 			})
@@ -105,7 +105,7 @@ func Benchmark_clusterLimitRedis_Allow(b *testing.B) {
 				Group:      groupName,
 			}
 
-			ringClient := net.NewRedisRingClient(&net.RedisOptions{Addrs: []string{redisAddr}})
+			ringClient := net.NewRedisClient(&net.RedisOptions{Addrs: []string{redisAddr}})
 			defer ringClient.Close()
 			c := newClusterRateLimiterRedis(
 				clusterClientlimit,
@@ -179,7 +179,7 @@ func Test_clusterLimitRedis_Allow(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			ringClient := net.NewRedisRingClient(&net.RedisOptions{Addrs: []string{redisAddr}})
+			ringClient := net.NewRedisClient(&net.RedisOptions{Addrs: []string{redisAddr}})
 			defer ringClient.Close()
 			c := newClusterRateLimiterRedis(
 				tt.settings,
@@ -241,7 +241,7 @@ func Test_clusterLimitRedis_Delta(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			ringClient := net.NewRedisRingClient(&net.RedisOptions{Addrs: []string{redisAddr}})
+			ringClient := net.NewRedisClient(&net.RedisOptions{Addrs: []string{redisAddr}})
 			defer ringClient.Close()
 			c := newClusterRateLimiterRedis(
 				tt.settings,
@@ -305,7 +305,7 @@ func Test_clusterLimitRedis_Oldest(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			ringClient := net.NewRedisRingClient(&net.RedisOptions{Addrs: []string{redisAddr}})
+			ringClient := net.NewRedisClient(&net.RedisOptions{Addrs: []string{redisAddr}})
 			defer ringClient.Close()
 			c := newClusterRateLimiterRedis(
 				tt.settings,
@@ -370,7 +370,7 @@ func Test_clusterLimitRedis_RetryAfter(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			ringClient := net.NewRedisRingClient(&net.RedisOptions{Addrs: []string{redisAddr}})
+			ringClient := net.NewRedisClient(&net.RedisOptions{Addrs: []string{redisAddr}})
 			defer ringClient.Close()
 			c := newClusterRateLimiterRedis(
 				tt.settings,
@@ -402,7 +402,7 @@ func TestFailOpenOnRedisError(t *testing.T) {
 		Group:      "agroup",
 	}
 	// redis unavailable
-	ringClient := net.NewRedisRingClient(&net.RedisOptions{})
+	ringClient := net.NewRedisClient(&net.RedisOptions{})
 	defer ringClient.Close()
 
 	c := newClusterRateLimiterRedis(

@@ -66,7 +66,7 @@ func verifyAttempts(t *testing.T, capacity int, emission time.Duration, incremen
 	redisAddr, done := redistest.NewTestRedis(t)
 	defer done()
 
-	ringClient := net.NewRedisRingClient(
+	ringClient := net.NewRedisClient(
 		&net.RedisOptions{
 			Addrs: []string{redisAddr},
 		},
@@ -94,7 +94,7 @@ func verifyAttempts(t *testing.T, capacity int, emission time.Duration, incremen
 }
 
 func TestLeakyBucketRedisError(t *testing.T) {
-	ringClient := net.NewRedisRingClient(
+	ringClient := net.NewRedisClient(
 		&net.RedisOptions{
 			Addrs: []string{"no-such-host.test:123"},
 		},
@@ -120,7 +120,7 @@ func TestLeakyBucketRedisStoredNumberPrecision(t *testing.T) {
 	redisAddr, done := redistest.NewTestRedis(t)
 	defer done()
 
-	ringClient := net.NewRedisRingClient(
+	ringClient := net.NewRedisClient(
 		&net.RedisOptions{
 			Addrs: []string{redisAddr},
 		},
